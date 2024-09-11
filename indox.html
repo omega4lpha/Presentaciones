@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gráfico con ECharts y Carga de Excel</title>
+    <style>
+        body{
+            background-color: rgb(247, 242, 253);
+        }
+        #main {
+            width: 600px;
+            height: 400px;
+            margin-bottom: 20px;
+        }
+        #fileInput, #yearSelect {
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+
+    <input type="file" id="fileInput" />
+    <select id="yearSelect">
+        <option value="all">Todos los años</option>
+        <!-- Las opciones de años serán añadidas dinámicamente -->
+    </select>
+    <div id="main"></div>
+
+    <!-- Incluye la biblioteca ECharts desde la CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/echarts/dist/echarts.min.js"></script>
+    <!-- Incluye la biblioteca xlsx para leer archivos Excel -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+
+    <script>
+        // Inicializar el gráfico en el div con id "main"
+        var chart = echarts.init(document.getElementById('main'));
+
+        // Función para procesar el archivo Excel
+        function handleFile(e) {
+            var file = e.target.files[0];
+            var reader = new FileReader();
+            
+            reader.onload = function(event) {
+                var data = new Uint8Array(event.target.result);
+                var workbook = XLSX.read(data, { type: 'array' });
+
+                // Asumimos que los datos están en la primera hoja
+                var worksheet = workbook.Sheets[workbook.SheetNames[0]];
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+                // Convertir los datos de JSON a formato usado en el gráfico
+                processExcelData(jsonData);
+            };
+
+            reader.readAsArrayBuffer(file);
+        }
+
+        // Función para procesar los datos del Excel y generar el gráfico
+        function processExcelData(jsonData) {
+            var headers = jsonData[0];
+            var data = jsonData.slice(1);
+
+            var yearData = {};
+            var carreras = {};
+
+            data.forEach(row => {
+                var year = row[0];
+                var matriculados = row[1];
+                var empleabilidad = row[2];
+                var n_apariciones = row[3];
+                var n_iniciativas = row[4];
+                var nps = row[5];
+                var carrera = row[6];
+
+                if (!yearData[year]) {
+                    yearData[year] = [];
+                }
+                yearData[year].push([matriculados, empleabilidad, n_apariciones, n_iniciativas, nps, carrera]);
+
+                if (!carreras[carrera]) {
+                    carreras[carrera] = {
+                        matriculados: 0,
+                        empleabilidad: 0,
+                        n_apariciones: 0,
+                        n_iniciativas: 0,
+                        nps: 0,
+                        count: 0
+                    };
+                }
+
+                carreras[carrera].matriculados += matriculados;
+                carreras[carrera].empleabilidad += empleabilidad;
+                carreras[carrera].n_apariciones += n_apariciones;
+                carreras[carrera].n_iniciativas += n_iniciativas;
+                carreras[carrera].nps += nps;
+                carreras[carrera].count += 1;
+            });
+
+            // Convertir a formato adecuado para el gráfico
+            var combinedData = [];
+            for (var carrera in carreras) {
+                var item = carreras[carrera];
+                combinedData.push([
+                    item.matriculados,
+                    item.empleabilidad / item.count,
+                    item.n_apariciones,
+                    item.n_iniciativas,
+                    item.nps / item.count,
+                    carrera
+                ]);
+            }
+
+            // Añadir años al select
+            var yearSelect = document.getElementById('yearSelect');
+            var years = Object.keys(yearData);
+            years.forEach(year => {
+                var option = document.createElement('option');
+                option.value = year;
+                option.textContent = year;
+                yearSelect.appendChild(option);
+            });
+
+            // Actualizar el gráfico con los datos de todos los años
+            updateChart(yearData, combinedData);
+
+            // Cambiar el gráfico cuando se selecciona un nuevo año
+            yearSelect.addEventListener('change', function () {
+                var selectedYear = this.value;
+                updateChart(yearData, combinedData, selectedYear);
+            });
+        }
+
+        // Función para actualizar el gráfico
+        function updateChart(yearData, combinedData, selectedYear = 'all') {
+            var dataToDisplay = selectedYear === 'all' ? combinedData : yearData[selectedYear] || [];
+
+            var option = {
+                tooltip: {
+                    trigger: 'item',
+                    formatter: function (params) {
+                        var data = params.data;
+                        return `
+                            <strong>Carrera:</strong> ${data[5]}<br/>
+                            <strong>Matriculados:</strong> ${data[0]}<br/>
+                            <strong>Empleabilidad:</strong> ${data[1]}%<br/>
+                            <strong>Número de Apariciones:</strong> ${data[2]}<br/>
+                            <strong>Número de Iniciativas:</strong> ${data[3]}<br/>
+                            <strong>NPS:</strong> ${data[4]}
+                        `;
+                    }
+                },
+                xAxis: {
+                    name: 'Matriculados',
+                    type: 'value'
+                },
+                yAxis: {
+                    name: 'Empleabilidad (%)',
+                    type: 'value'
+                },
+                series: [{
+                    symbol: function (data) {
+                        var nps = data[4];
+                        if (nps < 5) {
+                            return 'path://M512 960c248.352 0 448-199.648 448-448S760.352 64 512 64 64 263.648 64 512s199.648 448 448 448zm0-64C299.648 896 128 724.352 128 512S299.648 128 512 128s384 171.648 384 384-171.648 384-384 384zm-64-320h128c17.664 0 32 14.336 32 32s-14.336 32-32 32H448c-17.664 0-32-14.336-32-32s14.336-32 32-32zm192-32c0-70.592-57.408-128-128-128s-128 57.408-128 128h-64c0-105.888 86.112-192 192-192s192 86.112 192 192h-64z'; // Cara triste
+                        } else if (nps === 5) {
+                            return 'path://M512 960c248.352 0 448-199.648 448-448S760.352 64 512 64 64 263.648 64 512s199.648 448 448 448zm0-64C299.648 896 128 724.352 128 512S299.648 128 512 128s384 171.648 384 384-171.648 384-384 384zm-128-320h256c17.664 0 32 14.336 32 32s-14.336 32-32 32H384c-17.664 0-32-14.336-32-32s14.336-32 32-32zm0-128h256c17.664 0 32 14.336 32 32s-14.336 32-32 32H384c-17.664 0-32-14.336-32-32s14.336-32 32-32z'; // Cara neutra
+                        } else {
+                            return 'path://M512 960c248.352 0 448-199.648 448-448S760.352 64 512 64 64 263.648 64 512s199.648 448 448 448zm0-64C299.648 896 128 724.352 128 512S299.648 128 512 128s384 171.648 384 384-171.648 384-384 384zm0-128c-70.592 0-128-57.408-128-128h-64c0 105.888 86.112 192 192 192s192-86.112 192-192h-64c0 70.592-57.408 128-128 128zm-128-192h256c17.664 0 32 14.336 32 32s-14.336 32-32 32H384c-17.664 0-32-14.336-32-32s14.336-32 32-32z'; // Cara feliz
+                        }
+                    },
+                    symbolSize: function (data) {
+                        return data[2];
+                    },
+                    data: dataToDisplay,
+                    type: 'scatter',
+                    itemStyle: {
+                        color: function (param) {
+                            var n_iniciativas = param.data[3];
+                            if (n_iniciativas < 4) {
+                                return '#ff002b'; // Pocos iniciativas - color claro
+                            } else if (n_iniciativas < 7) {
+                                return '#fcc50f'; // Degradado intermedio
+                            } else {
+                                return '#74eb34'; // Muchas iniciativas - color oscuro
+                            }
+                        }
+                    }
+                }]
+            };
+
+            chart.setOption(option);
+        }
+
+        // Asignar el manejador del archivo
+        document.getElementById('fileInput').addEventListener('change', handleFile);
+    </script>
+
+</body>
+</html>
