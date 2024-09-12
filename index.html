@@ -7,10 +7,11 @@
     <style>
         body {
             background-color: rgb(247, 242, 253);
+            font-family: Arial, Helvetica, sans-serif;
         }
         #main {
-            width: 1200px;
-            height: 600px;
+            width: 80vw;
+            height: 60vh;
             margin-bottom: 20px;
         }
         #fileInput, #yearSelect, #schoolSelect, #careerSelect, #resetFilters, #resetSchool, #resetCareer {
@@ -39,9 +40,44 @@
             font-size: 8vw;
             color:rgb(0, 0, 0);
         }
+        .padre{
+            display:flex;
+            flex-direction: row;
+
+        }
+        .barra_lateral{
+            width: 5vw;
+            height: 60vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: linear-gradient(to top, red, yellow, green);
+            margin-left: 10px;
+            position: relative;
+        }
+        .cien{
+            position: absolute;
+            top:95%;
+            left:50%;
+            transform: translateX(-50%);
+        }
+        .cero{
+            position: absolute;
+            bottom: 0%;
+            left:50%;
+            transform: translateX(50%);
+        }
+
+        .leyenda{
+            justify-content: center;
+            align-items: center;
+        }
+ 
     </style>
 </head>
 <body>
+
+    
     <h1>MAPA ESTRATÉGICO</h1>
     
     <input type="file" id="fileInput" />
@@ -59,7 +95,33 @@
     </select>
 
     <button id="resetFilters" class="button resetAll">Limpiar Filtros</button>
-    <div id="main"></div>
+    <div class="padre">
+        <div id="main"></div>
+        <div class="barra_lateral">
+            <div class="cien">0</div>
+            <div class="0">7</div>
+        </div>
+    </div>
+    <div class="leyenda">
+        <p>Indicadores del NPS, en el orden de Nulo, Promotor, Neutro, Detractor </p>
+        <svg width="100" height="100" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+            <path d="M512 960c248.352 0 448-199.648 448-448S760.352 64 512 64 64 263.648 64 512s199.648 448 448 448zm0-64C299.648 896 128 724.352 128 512S299.648 128 512 128s384 171.648 384 384-171.648 384-384 384z" fill="none" stroke="black" stroke-width="64"/>
+          </svg>
+          <svg width="100" height="100" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+            <path d="M512 960c248.352 0 448-199.648 448-448S760.352 64 512 64 64 263.648 64 512s199.648 448 448 448zm0-64C299.648 896 128 724.352 128 512S299.648 128 512 128s384 171.648 384 384-171.648 384-384 384zm0-448c17.664 0 32 14.336 32 32v128c0 17.664-14.336 32-32 32s-32-14.336-32-32V544H352c-17.664 0-32-14.336-32-32s14.336-32 32-32h128V352c0-17.664 14.336-32 32-32s32 14.336 32 32v128h128c17.664 0 32 14.336 32 32s-14.336 32-32 32H512z" fill="none" stroke="black" stroke-width="64"/>
+          </svg>
+          <svg width="100" height="100" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+            <path d="M512 960c248.352 0 448-199.648 448-448S760.352 64 512 64 64 263.648 64 512s199.648 448 448 448zm0-64C299.648 896 128 724.352 128 512S299.648 128 512 128s384 171.648 384 384-171.648 384-384 384zm-128-320h256c17.664 0 32 14.336 32 32s-14.336 32-32 32H384c-17.664 0-32-14.336-32-32s14.336-32 32-32zm0-128h256c17.664 0 32 14.336 32 32s-14.336 32-32 32H384c-17.664 0-32-14.336-32-32s14.336-32 32-32z" fill="none" stroke="black" stroke-width="64"/>
+          </svg>
+          <svg width="100" height="100" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+            <path d="M512 960c248.352 0 448-199.648 448-448S760.352 64 512 64 64 263.648 64 512s199.648 448 448 448zm0-64C299.648 896 128 724.352 128 512S299.648 128 512 128s384 171.648 384 384-171.648 384-384 384zm-256-384h512c17.664 0 32 14.336 32 32s-14.336 32-32 32H256c-17.664 0-32-14.336-32-32s14.336-32 32-32z" fill="none" stroke="black" stroke-width="64"/>
+          </svg>
+          
+          
+          
+    </div>
+    <div class="leyenda">Las esferas varían de tamaño en función de las apariciones en los medios</div>
+    
 
     <!-- Incluye la biblioteca ECharts desde la CDN -->
     <script src="https://cdn.jsdelivr.net/npm/echarts/dist/echarts.min.js"></script>
@@ -292,7 +354,10 @@
                 series: [{
                     symbol: function (data) {
                         var nps = data[4];
-                        if (nps < 5) {
+                        if(nps == 0){
+                            return 'path://M512 960c248.352 0 448-199.648 448-448S760.352 64 512 64 64 263.648 64 512s199.648 448 448 448zm0-64C299.648 896 128 724.352 128 512S299.648 128 512 128s384 171.648 384 384-171.648 384-384 384z';
+                        }
+                        else if (nps < 5) {
                             return 'path://M512 960c248.352 0 448-199.648 448-448S760.352 64 512 64 64 263.648 64 512s199.648 448 448 448zm0-64C299.648 896 128 724.352 128 512S299.648 128 512 128s384 171.648 384 384-171.648 384-384 384zm-256-384h512c17.664 0 32 14.336 32 32s-14.336 32-32 32H256c-17.664 0-32-14.336-32-32s14.336-32 32-32z';
                         } else if (nps === 5) {
                             return 'path://M512 960c248.352 0 448-199.648 448-448S760.352 64 512 64 64 263.648 64 512s199.648 448 448 448zm0-64C299.648 896 128 724.352 128 512S299.648 128 512 128s384 171.648 384 384-171.648 384-384 384zm-128-320h256c17.664 0 32 14.336 32 32s-14.336 32-32 32H384c-17.664 0-32-14.336-32-32s14.336-32 32-32zm0-128h256c17.664 0 32 14.336 32 32s-14.336 32-32 32H384c-17.664 0-32-14.336-32-32s14.336-32 32-32z';
