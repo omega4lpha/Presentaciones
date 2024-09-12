@@ -3,117 +3,252 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gráfico con ECharts y Filtro por Año</title>
+    <title>Gráfico con ECharts y Carga de Excel</title>
     <style>
-        /* Ajusta el tamaño del contenedor */
+        body {
+            background-color: rgb(247, 242, 253);
+        }
         #main {
-            width: 600px;
-            height: 400px;
+            width: 1200px;
+            height: 600px;
             margin-bottom: 20px;
+        }
+        #fileInput, #yearSelect, #schoolSelect, #careerSelect, #resetFilters, #resetSchool, #resetCareer {
+            margin-bottom: 20px;
+        }
+        .button {
+            padding: 5px 10px;
+            margin: 5px;
+            border: none;
+            border-radius: 3px;
+            color: white;
+            cursor: pointer;
+        }
+        .resetAll {
+            background-color: #007bff;
+        }
+        .resetSchool {
+            background-color: #28a745;
+        }
+        .resetCareer {
+            background-color: #dc3545;
+        }
+        h1{
+            font-family: Arial, Helvetica, sans-serif;
+            text-align: center;
+            font-size: 8vw;
+            color:rgb(0, 0, 0);
         }
     </style>
 </head>
 <body>
-
-    <!-- Contenedor para el gráfico -->
-    <div id="main"></div>
-
-    <!-- Selector de año -->
-    <label for="yearSelect">Selecciona el año:</label>
+        <h1>MAPA ESTRATÉGICO</h1>
+    
+    <input type="file" id="fileInput" />
     <select id="yearSelect">
         <option value="all">Todos los años</option>
-        <option value="2022">2022</option>
-        <option value="2023">2023</option>
-        <option value="2024">2024</option>
+        <!-- Las opciones de años serán añadidas dinámicamente -->
     </select>
+    <select id="schoolSelect">
+        <option value="all">Todas las escuelas</option>
+        <!-- Las opciones de escuelas serán añadidas dinámicamente -->
+    </select>
+    <select id="careerSelect">
+        <option value="all">Todas las carreras</option>
+        <!-- Las opciones de carreras serán añadidas dinámicamente -->
+    </select>
+
+    <button id="resetFilters" class="button resetAll">Limpiar Filtros</button>
+    <div id="main"></div>
 
     <!-- Incluye la biblioteca ECharts desde la CDN -->
     <script src="https://cdn.jsdelivr.net/npm/echarts/dist/echarts.min.js"></script>
+    <!-- Incluye la biblioteca xlsx para leer archivos Excel -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 
     <script>
-        // Datos con años, carreras, y otras variables
-        var data = {
-            '2022': [
-                // Formato de los datos: [matriculados, empleabilidad, n_apariciones, n_iniciativas, nps, carrera]
-                [500, 85, 50, 3, 4, 'Carrera A'],
-                [700, 75, 80, 6, 5, 'Carrera B'],
-                [900, 90, 100, 10, 7, 'Carrera C']
-            ],
-            '2023': [
-                [600, 88, 60, 4, 6, 'Carrera A'],
-                [800, 78, 70, 5, 5, 'Carrera B'],
-                [1000, 92, 110, 11, 8, 'Carrera C']
-            ],
-            '2024': [
-                [550, 83, 40, 3, 3, 'Carrera A'],
-                [750, 79, 90, 7, 5, 'Carrera B'],
-                [1050, 94, 120, 12, 9, 'Carrera C']
-            ]
-        };
-
-        // Inicializar el gráfico en el div con id "main"
         var chart = echarts.init(document.getElementById('main'));
+        var originalSchools = [];
+        var originalCareers = [];
+        var schoolSelect = document.getElementById('schoolSelect');
+        var careerSelect = document.getElementById('careerSelect');
+        var yearSelect = document.getElementById('yearSelect');
+        var dataToDisplay = [];
+        var originalYearData = {};
+        
+        function handleFile(e) {
+            var file = e.target.files[0];
+            var reader = new FileReader();
+            
+            reader.onload = function(event) {
+                var data = new Uint8Array(event.target.result);
+                var workbook = XLSX.read(data, { type: 'array' });
+                var worksheet = workbook.Sheets[workbook.SheetNames[0]];
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
 
-        // Función para combinar los datos de todos los años para una misma carrera
-        function combineData() {
-            var combinedData = {};
+                processExcelData(jsonData);
+            };
 
-            // Recorre cada año
-            for (var year in data) {
-                var yearData = data[year];
+            reader.readAsArrayBuffer(file);
+        }
 
-                // Recorre cada carrera dentro de un año
-                for (var i = 0; i < yearData.length; i++) {
-                    var carrera = yearData[i][5];
+        function processExcelData(jsonData) {
+            var headers = jsonData[0];
+            var data = jsonData.slice(1);
 
-                    if (!combinedData[carrera]) {
-                        combinedData[carrera] = {
-                            matriculados: 0,
-                            empleabilidad: 0,
-                            n_apariciones: 0,
-                            n_iniciativas: 0,
-                            nps: 0,
-                            count: 0 // para calcular promedios
-                        };
-                    }
+            var yearData = {};
+            var carreras = {};
+            var escuelasSet = new Set();
+            var carreraEscuelaMap = {};
+            var escuelaCarreraMap = {};
 
-                    combinedData[carrera].matriculados += yearData[i][0];
-                    combinedData[carrera].empleabilidad += yearData[i][1];
-                    combinedData[carrera].n_apariciones += yearData[i][2];
-                    combinedData[carrera].n_iniciativas += yearData[i][3];
-                    combinedData[carrera].nps += yearData[i][4];
-                    combinedData[carrera].count += 1; // Incrementamos el número de años para esta carrera
+            data.forEach(row => {
+                var year = row[0];
+                var matriculados = row[1];
+                var empleabilidad = row[2];
+                var n_apariciones = row[3];
+                var n_iniciativas = row[4];
+                var nps = row[5];
+                var carrera = row[6];
+                var escuela = row[7];
+
+                escuelasSet.add(escuela);
+
+                if (!yearData[year]) {
+                    yearData[year] = [];
                 }
-            }
+                yearData[year].push([matriculados, empleabilidad, n_apariciones, n_iniciativas, nps, carrera, escuela]);
 
-            // Ajustamos los promedios para las métricas que requieren promedio
-            var finalData = [];
-            for (var carrera in combinedData) {
-                var item = combinedData[carrera];
-                finalData.push([
+                if (!carreras[carrera]) {
+                    carreras[carrera] = {
+                        matriculados: 0,
+                        empleabilidad: 0,
+                        n_apariciones: 0,
+                        n_iniciativas: 0,
+                        nps: 0,
+                        count: 0,
+                        escuelas: new Set()
+                    };
+                }
+
+                carreras[carrera].matriculados += matriculados;
+                carreras[carrera].empleabilidad += empleabilidad;
+                carreras[carrera].n_apariciones += n_apariciones;
+                carreras[carrera].n_iniciativas += n_iniciativas;
+                carreras[carrera].nps += nps;
+                carreras[carrera].escuelas.add(escuela);
+                carreras[carrera].count += 1;
+
+                if (!escuelaCarreraMap[escuela]) {
+                    escuelaCarreraMap[escuela] = new Set();
+                }
+                escuelaCarreraMap[escuela].add(carrera);
+
+                if (!carreraEscuelaMap[carrera]) {
+                    carreraEscuelaMap[carrera] = new Set();
+                }
+                carreraEscuelaMap[carrera].add(escuela);
+            });
+
+            var combinedData = [];
+            for (var carrera in carreras) {
+                var item = carreras[carrera];
+                combinedData.push([
                     item.matriculados,
-                    (item.empleabilidad / item.count), // Promedio de empleabilidad
+                    item.empleabilidad,
                     item.n_apariciones,
                     item.n_iniciativas,
-                    (item.nps / item.count), // Promedio de NPS
-                    carrera
+                    item.nps / item.count,
+                    carrera,
+                    Array.from(item.escuelas).join(', ')
                 ]);
             }
 
-            return finalData;
+            var years = Object.keys(yearData);
+            years.forEach(year => {
+                var option = document.createElement('option');
+                option.value = year;
+                option.textContent = year;
+                yearSelect.appendChild(option);
+            });
+
+            originalSchools = Array.from(escuelasSet);
+            originalCareers = Object.keys(carreras);
+
+            schoolSelect.innerHTML = '';
+            careerSelect.innerHTML = '';
+
+            var schoolOptions = ['<option value="all">Todas las escuelas</option>'];
+            var careerOptions = ['<option value="all">Todas las carreras</option>'];
+
+            originalSchools.forEach(escuela => {
+                schoolOptions.push(`<option value="${escuela}">${escuela}</option>`);
+            });
+
+            originalCareers.forEach(carrera => {
+                careerOptions.push(`<option value="${carrera}">${carrera}</option>`);
+            });
+
+            schoolSelect.innerHTML = schoolOptions.join('');
+            careerSelect.innerHTML = careerOptions.join('');
+
+            dataToDisplay = combinedData;
+            originalYearData = yearData;
+
+            updateChart(yearData, combinedData);
+
+            yearSelect.addEventListener('change', function () {
+                var selectedYear = this.value;
+                var selectedSchool = schoolSelect.value;
+                var selectedCareer = careerSelect.value;
+                updateChart(yearData, combinedData, selectedYear, selectedSchool, selectedCareer);
+            });
+
+            schoolSelect.addEventListener('change', function () {
+                var selectedSchool = this.value;
+                var selectedYear = yearSelect.value;
+                var selectedCareer = careerSelect.value;
+                updateChart(yearData, combinedData, selectedYear, selectedSchool, selectedCareer);
+
+                if (selectedSchool !== 'all') {
+                    var careers = escuelaCarreraMap[selectedSchool] || [];
+                    var careerOptions = careerSelect.querySelectorAll('option');
+                    careerOptions.forEach(option => {
+                        option.style.display = careers.has(option.value) ? 'block' : 'none';
+                    });
+                    if (!careers.has(careerSelect.value)) {
+                        careerSelect.value = 'all';
+                        updateChart(yearData, combinedData, selectedYear, selectedSchool, 'all');
+                    }
+                }
+            });
+
+            careerSelect.addEventListener('change', function () {
+                var selectedCareer = this.value;
+                var selectedYear = yearSelect.value;
+                var selectedSchool = schoolSelect.value;
+                updateChart(yearData, combinedData, selectedYear, selectedSchool, selectedCareer);
+
+                if (selectedCareer !== 'all') {
+                    var schools = carreraEscuelaMap[selectedCareer] || [];
+                    var schoolOptions = schoolSelect.querySelectorAll('option');
+                    schoolOptions.forEach(option => {
+                        option.style.display = schools.has(option.value) ? 'block' : 'none';
+                    });
+                    if (!schools.has(schoolSelect.value)) {
+                        schoolSelect.value = 'all';
+                        updateChart(yearData, combinedData, selectedYear, 'all', selectedCareer);
+                    }
+                }
+            });
         }
 
-        // Función para generar el gráfico basado en los datos del año seleccionado
-        function updateChart(year) {
-            var yearData = [];
-
-            // Si se selecciona "Todos los años", combinamos y sumamos los datos de todos los años
-            if (year === 'all') {
-                yearData = combineData();
-            } else {
-                // Obtener datos para el año seleccionado
-                yearData = data[year];
-            }
+        function updateChart(yearData, combinedData, selectedYear = 'all', selectedSchool = 'all', selectedCareer = 'all') {
+            var data = selectedYear === 'all' ? combinedData : yearData[selectedYear] || [];
+            data = data.filter(row => 
+                (selectedSchool === 'all' || row[6] === selectedSchool) && 
+                (selectedCareer === 'all' || row[5] === selectedCareer)
+            );
 
             var option = {
                 tooltip: {
@@ -122,8 +257,9 @@
                         var data = params.data;
                         return `
                             <strong>Carrera:</strong> ${data[5]}<br/>
+                            <strong>Escuela:</strong> ${data[6]}<br/>
                             <strong>Matriculados:</strong> ${data[0]}<br/>
-                            <strong>Empleabilidad:</strong> ${data[1]}%<br/>
+                            <strong>Empleabilidad:</strong> ${data[1]}<br/>
                             <strong>Número de Apariciones:</strong> ${data[2]}<br/>
                             <strong>Número de Iniciativas:</strong> ${data[3]}<br/>
                             <strong>NPS:</strong> ${data[4]}
@@ -140,48 +276,74 @@
                 },
                 series: [{
                     symbol: function (data) {
-                        var nps = data[4]; // nps es el quinto valor en el array de datos
+                        var nps = data[4];
                         if (nps < 5) {
-                            return 'path://M512 960c248.352 0 448-199.648 448-448S760.352 64 512 64 64 263.648 64 512s199.648 448 448 448zm0-64C299.648 896 128 724.352 128 512S299.648 128 512 128s384 171.648 384 384-171.648 384-384 384zm-64-320h128c17.664 0 32 14.336 32 32s-14.336 32-32 32H448c-17.664 0-32-14.336-32-32s14.336-32 32-32zm192-32c0-70.592-57.408-128-128-128s-128 57.408-128 128h-64c0-105.888 86.112-192 192-192s192 86.112 192 192h-64z'; // Cara triste
+                            return 'path://M512 960c248.352 0 448-199.648 448-448S760.352 64 512 64 64 263.648 64 512s199.648 448 448 448zm0-64C299.648 896 128 724.352 128 512S299.648 128 512 128s384 171.648 384 384-171.648 384-384 384zm-256-384h512c17.664 0 32 14.336 32 32s-14.336 32-32 32H256c-17.664 0-32-14.336-32-32s14.336-32 32-32z';
                         } else if (nps === 5) {
-                            return 'path://M512 960c248.352 0 448-199.648 448-448S760.352 64 512 64 64 263.648 64 512s199.648 448 448 448zm0-64C299.648 896 128 724.352 128 512S299.648 128 512 128s384 171.648 384 384-171.648 384-384 384zm-128-320h256c17.664 0 32 14.336 32 32s-14.336 32-32 32H384c-17.664 0-32-14.336-32-32s14.336-32 32-32zm0-128h256c17.664 0 32 14.336 32 32s-14.336 32-32 32H384c-17.664 0-32-14.336-32-32s14.336-32 32-32z'; // Cara neutra
+                            return 'path://M512 960c248.352 0 448-199.648 448-448S760.352 64 512 64 64 263.648 64 512s199.648 448 448 448zm0-64C299.648 896 128 724.352 128 512S299.648 128 512 128s384 171.648 384 384-171.648 384-384 384zm-128-320h256c17.664 0 32 14.336 32 32s-14.336 32-32 32H384c-17.664 0-32-14.336-32-32s14.336-32 32-32zm0-128h256c17.664 0 32 14.336 32 32s-14.336 32-32 32H384c-17.664 0-32-14.336-32-32s14.336-32 32-32z';
                         } else {
-                            return 'path://M512 960c248.352 0 448-199.648 448-448S760.352 64 512 64 64 263.648 64 512s199.648 448 448 448zm0-64C299.648 896 128 724.352 128 512S299.648 128 512 128s384 171.648 384 384-171.648 384-384 384zm0-128c-70.592 0-128-57.408-128-128h-64c0 105.888 86.112 192 192 192s192-86.112 192-192h-64c0 70.592-57.408 128-128 128zm-128-192h256c17.664 0 32 14.336 32 32s-14.336 32-32 32H384c-17.664 0-32-14.336-32-32s14.336-32 32-32z'; // Cara feliz
+                            return 'path://M512 960c248.352 0 448-199.648 448-448S760.352 64 512 64 64 263.648 64 512s199.648 448 448 448zm0-64C299.648 896 128 724.352 128 512S299.648 128 512 128s384 171.648 384 384-171.648 384-384 384zm0-448c17.664 0 32 14.336 32 32v128c0 17.664-14.336 32-32 32s-32-14.336-32-32V544H352c-17.664 0-32-14.336-32-32s14.336-32 32-32h128V352c0-17.664 14.336-32 32-32s32 14.336 32 32v128h128c17.664 0 32 14.336 32 32s-14.336 32-32 32H512z';
                         }
                     },
                     symbolSize: function (data) {
-                        return data[2]; // El tamaño del punto está basado en el "número de apariciones"
+                        return data[2];
                     },
-                    data: yearData,
+                    data: data,
                     type: 'scatter',
                     itemStyle: {
                         color: function (param) {
                             var n_iniciativas = param.data[3];
                             if (n_iniciativas < 4) {
-                                return '#ffcccc'; // Pocos iniciativas - color claro
+                                return '#ff002b';
                             } else if (n_iniciativas < 7) {
-                                return '#ff9999'; // Degradado intermedio
+                                return '#fcc50f';
                             } else {
-                                return '#ff3333'; // Muchas iniciativas - color oscuro
+                                return '#74eb34';
                             }
                         }
                     }
                 }]
             };
 
-            // Actualizar el gráfico con la nueva configuración
             chart.setOption(option);
         }
 
-        // Inicializar el gráfico con los datos de todos los años
-        updateChart('all');
+        document.getElementById('fileInput').addEventListener('change', handleFile);
 
-        // Cambiar el gráfico cuando se selecciona un nuevo año
-        document.getElementById('yearSelect').addEventListener('change', function () {
-            var selectedYear = this.value;
-            updateChart(selectedYear);  // Actualizar gráfico con el año seleccionado
+        document.getElementById('resetFilters').addEventListener('click', function() {
+            document.getElementById('yearSelect').value = 'all';
+            document.getElementById('schoolSelect').value = 'all';
+            document.getElementById('careerSelect').value = 'all';
+            schoolSelect.innerHTML = '<option value="all">Todas las escuelas</option>';
+            careerSelect.innerHTML = '<option value="all">Todas las carreras</option>';
+            originalSchools.forEach(school => {
+                var option = document.createElement('option');
+                option.value = school;
+                option.textContent = school;
+                schoolSelect.appendChild(option);
+            });
+            originalCareers.forEach(career => {
+                var option = document.createElement('option');
+                option.value = career;
+                option.textContent = career;
+                careerSelect.appendChild(option);
+            });
+            updateChart(originalYearData, dataToDisplay);
         });
-    </script>
 
+        document.getElementById('resetSchool').addEventListener('click', function() {
+            var selectedYear = document.getElementById('yearSelect').value;
+            document.getElementById('schoolSelect').value = 'all';
+            careerSelect.value = 'all';
+            updateChart(originalYearData, dataToDisplay, selectedYear, 'all', 'all');
+        });
+
+        document.getElementById('resetCareer').addEventListener('click', function() {
+            var selectedYear = document.getElementById('yearSelect').value;
+            document.getElementById('careerSelect').value = 'all';
+            updateChart(originalYearData, dataToDisplay, selectedYear, schoolSelect.value, 'all');
+        });
+
+    </script>
 </body>
 </html>
