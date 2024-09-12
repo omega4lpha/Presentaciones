@@ -42,7 +42,7 @@
     </style>
 </head>
 <body>
-        <h1>MAPA ESTRATÉGICO</h1>
+    <h1>MAPA ESTRATÉGICO</h1>
     
     <input type="file" id="fileInput" />
     <select id="yearSelect">
@@ -274,6 +274,21 @@
                     name: 'Titulados/Empleadores',
                     type: 'value'
                 },
+                dataZoom: [
+                    {
+                        type: 'slider', // barra de zoom
+                        show: true,
+                        xAxisIndex: [0],
+                        start: 0,
+                        end: 100
+                    },
+                    {
+                        type: 'inside', // zoom por caja
+                        xAxisIndex: [0],
+                        start: 0,
+                        end: 100
+                    }
+                ],
                 series: [{
                     symbol: function (data) {
                         var nps = data[4];
